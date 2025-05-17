@@ -1,6 +1,29 @@
+
 /*
 
-Cleaning Data in SQL Queries
+🏠 Nashville Housing SQL Data Cleaning Project
+🔧 Tools Used
+SQL Server
+
+T-SQL
+
+📘 Project Overview
+This project focuses on cleaning and transforming a real-world housing dataset from Nashville using SQL. The goal was to prepare the dataset for further analysis and visualization (e.g., in Power BI) by resolving common data quality issues such as missing values, inconsistent formatting, and duplicates.
+
+📊 Key Objectives
+Standardize date formats
+
+Impute missing property address values
+
+Split compound address fields into separate columns (street, city, state)
+
+Normalize categorical values (e.g., "Y" → "Yes", "N" → "No")
+
+Identify and remove duplicate records
+
+Drop unnecessary columns to streamline the dataset
+
+
 
 */
 
@@ -11,27 +34,22 @@ From NashvilleHousing
 
 --------------------------------------------------------------------------------------------------------------------------
 
--- Standardize Date Format
+-- 🧠 Techniques Used
+--1. Standardized Sale Date Format
 
 
 
 ALTER TABLE NashvilleHousing
-Add SaleDateConverted Date;
+ADD SaleDateConverted DATE;
 
-Update NashvilleHousing
-SET SaleDateConverted = CONVERT(Date,SaleDate)
+UPDATE NashvilleHousing
+SET SaleDateConverted = CONVERT(Date, SaleDate);
 
 
  --------------------------------------------------------------------------------------------------------------------------
 
--- Populate Property Address data
-
-Select *
-From NashvilleHousing
---Where PropertyAddress is null
-order by ParcelID
-
-
+--2.Imputed Missing Property Addresses
+--Used a self-join on ParcelID to fill in missing PropertyAddress values:
 
 Select a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress,b.PropertyAddress)
 From NashvilleHousing a
@@ -40,21 +58,19 @@ JOIN NashvilleHousing b
 	AND a.[UniqueID ] <> b.[UniqueID ]
 Where a.PropertyAddress is null
 
-
-Update a
-SET PropertyAddress = ISNULL(a.PropertyAddress,b.PropertyAddress)
-From NashvilleHousing a
+	
+UPDATE a
+SET a.PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+FROM NashvilleHousing a
 JOIN NashvilleHousing b
-	on a.ParcelID = b.ParcelID
-	AND a.[UniqueID ] <> b.[UniqueID ]
-Where a.PropertyAddress is null
-
-
-
+  ON a.ParcelID = b.ParcelID
+  AND a.[UniqueID ] <> b.[UniqueID ]
+WHERE a.PropertyAddress IS NULL;
 
 --------------------------------------------------------------------------------------------------------------------------
 
--- Breaking out Address into Individual Columns (Address, City, State)
+--3. Split Address Fields into Individual Components
+--Property Address:
 
 
 Select PropertyAddress
@@ -65,77 +81,38 @@ From NashvilleHousing
 SELECT
 SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1 ) as Address
 , SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) + 1 , LEN(PropertyAddress)) as Address
-
 From NashvilleHousing
 
 
 ALTER TABLE NashvilleHousing
-Add PropertySplitAddress Nvarchar(255);
+ADD PropertySplitAddress NVARCHAR(255),
+    PropertySplitCity NVARCHAR(255);
 
-Update NashvilleHousing
-SET PropertySplitAddress = SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1 )
-
-
-ALTER TABLE NashvilleHousing
-Add PropertySplitCity Nvarchar(255);
-
-Update NashvilleHousing
-SET PropertySplitCity = SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) + 1 , LEN(PropertyAddress))
+UPDATE NashvilleHousing
+SET PropertySplitAddress = SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1),
+    PropertySplitCity = SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) + 1 , LEN(PropertyAddress));
 
 
 
-
-Select *
-From NashvilleHousing
-
-
-
-
+--Owner Address using PARSENAME:
 
 Select OwnerAddress
 From NashvilleHousing
 
-
-Select
-PARSENAME(REPLACE(OwnerAddress, ',', '.') , 3)
-,PARSENAME(REPLACE(OwnerAddress, ',', '.') , 2)
-,PARSENAME(REPLACE(OwnerAddress, ',', '.') , 1)
-From NashvilleHousing
-
-
-
 ALTER TABLE NashvilleHousing
-Add OwnerSplitAddress Nvarchar(255);
+ADD OwnerSplitAddress NVARCHAR(255),
+    OwnerSplitCity NVARCHAR(255),
+    OwnerSplitState NVARCHAR(255);
 
-Update NashvilleHousing
-SET OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.') , 3)
-
-
-ALTER TABLE NashvilleHousing
-Add OwnerSplitCity Nvarchar(255);
-
-Update NashvilleHousing
-SET OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.') , 2)
-
-
-
-ALTER TABLE NashvilleHousing
-Add OwnerSplitState Nvarchar(255);
-
-Update NashvilleHousing
-SET OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.') , 1)
-
-
-
-Select *
-From NashvilleHousing
-
+UPDATE NashvilleHousing
+SET OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 3),
+    OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 2),
+    OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.'), 1);
 
 
 
 --------------------------------------------------------------------------------------------------------------------------
-
-
+--4. Standardized 'SoldAsVacant' Field
 -- Change Y and N to Yes and No in "Sold as Vacant" field
 
 
@@ -144,90 +121,64 @@ From NashvilleHousing
 Group by SoldAsVacant
 order by 2
 
+UPDATE NashvilleHousing
+SET SoldAsVacant = 
+  CASE 
+    WHEN SoldAsVacant = 'Y' THEN 'Yes'
+    WHEN SoldAsVacant = 'N' THEN 'No'
+    ELSE SoldAsVacant
+  END;
+_______________________________________________________________________________
 
-
-
-Select SoldAsVacant
-, CASE When SoldAsVacant = 'Y' THEN 'Yes'
-	   When SoldAsVacant = 'N' THEN 'No'
-	   ELSE SoldAsVacant
-	   END
-From NashvilleHousing
-
-
-Update NashvilleHousing
-SET SoldAsVacant = CASE When SoldAsVacant = 'Y' THEN 'Yes'
-	   When SoldAsVacant = 'N' THEN 'No'
-	   ELSE SoldAsVacant
-	   END
-
-
-
-
+Select SoldAsVacant, 
+  CASE 
+  When SoldAsVacant = 'Y' THEN 'Yes'
+  When SoldAsVacant = 'N' THEN 'No'
+  ELSE SoldAsVacant
+END
+From NashvilleHousing;
 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- Remove Duplicates
+--5. Removed Duplicate Records
+--Used ROW_NUMBER() in a CTE to identify duplicates based on key columns:
 
-WITH RowNumCTE AS(
-Select *,
-	ROW_NUMBER() OVER (
-	PARTITION BY ParcelID,
-				 PropertyAddress,
-				 SalePrice,
-				 SaleDate,
-				 LegalReference
-				 ORDER BY
-					UniqueID
-					) row_num
-
-From NashvilleHousing
---order by ParcelID
+WITH RowNumCTE AS (
+  SELECT *,
+         ROW_NUMBER() OVER (
+            PARTITION BY ParcelID, PropertyAddress, SalePrice, SaleDate, LegalReference
+            ORDER BY UniqueID
+         ) AS row_num
+  FROM NashvilleHousing
 )
+DELETE FROM RowNumCTE
+WHERE row_num > 1;
+
+
 select *
 From RowNumCTE
-Where row_num > 1
+--Where row_num > 1
 --Order by PropertyAddress
-
-
-
-Select *
-From NashvilleHousing
-
-
-
 
 ---------------------------------------------------------------------------------------------------------
 
--- Delete Unused Columns
-
-
-
-Select *
-From NashvilleHousing
-
-
+--6. Dropped Unused Columns
+	
 ALTER TABLE NashvilleHousing
-DROP COLUMN OwnerAddress, TaxDistrict, PropertyAddress, SaleDate
+DROP COLUMN OwnerAddress, TaxDistrict, PropertyAddress, SaleDate;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------
------------------------------------------------------------------------------------------------
+/*✅ Final Outcome
+The dataset is now clean, standardized, and ready for downstream usage in Power BI or other data visualization tools. Key outcomes:
 
+✅ Enhanced data consistency and quality
+
+✅ Better readiness for analysis and reporting
+
+✅ Reduced noise by removing duplicates and irrelevant columns*/
 
 
 
